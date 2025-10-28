@@ -31,6 +31,8 @@ For multivariate time series, heatmaps, lag plots and scatter matrix plots can b
 The algorithm will be evaluated via **paper trading** using the **Alpaca API**. After training on historical stock and options data, it will execute trades in a simulated live market environment, allowing performance assessment (**profit/loss, Sharpe ratio, drawdown**) without risking real capital. -->
 
 
+## Video Presentation - https://youtu.be/5qRYx9y6_DM
+
 # **Historical Stock Data Visualization and Transformer-Based Price Prediction**
 
 ## **1. Objective**
