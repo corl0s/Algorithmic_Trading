@@ -475,13 +475,13 @@ The Transformer model’s performance was evaluated visually for **two context w
 
 1. **Predicted vs Actual Close Price (Normalized)**  
 
-![AAPL True vs Predicted](Data_Visualisation_files\pred_apple.png)
+![AAPL True vs Predicted](Data_Visualisation_files/pred_apple.png)
 
    The predictions remain nearly flat while the true prices fluctuate sharply, indicating that the model failed to capture temporal dynamics.  
 
    
 2. **Simulated Cumulative Profit (Normalized)**  
-      ![AAPL True vs Predicted](Data_Visualisation_files\cum_apple.png)
+      ![AAPL True vs Predicted](Data_Visualisation_files/cum_apple.png)
 
    The cumulative return curve trends downward, showing poor directional forecasting and overall loss in simulated trading.
 
@@ -516,9 +516,9 @@ A common visualization that is conducted to understand options data is "Implied 
 
 
 
-![Alt text](scholes_yoptions_files\scholes_yoptions_7_0.png "Implied Volatility vs Strike Price")
+![Alt text](scholes_yoptions_files/scholes_yoptions_7_0.png)
 
-![Alt text](scholes_yoptions_files\scholes_yoptions_9_1.png "Predicted Call vs Strike Price")
+![Alt text](scholes_yoptions_files/scholes_yoptions_9_1.png)
 
 
 ## 1. Black-Scholes Model
@@ -624,11 +624,11 @@ def black_scholes_call(S, X, T, r, sigma):
 We then pass this function through the given dataset and obtain the predicted call price as a data field. We record this observation as a separate column and extract as a csv file. Thus, we have a predicted call option price for the given dataset that is calculated in accordance to black-scholes model.
 
 
-![Alt text](scholes_yoptions_files\scholes_yoptions_6_0.png "Predicted Call vs Strike Price")
+![Alt text](scholes_yoptions_files/scholes_yoptions_6_0.png "Predicted Call vs Strike Price")
 
 Finally to evaluate our model, we find the $R^2$ score between the predicted Black Scholes call price and the Yahoo Last price. The $R^2$ score was found to be 0.941, which is good.
 
-![Alt text](scholes_yoptions_files\scholes_yoptions_8_0.png "Predicted Call vs Strike Price")
+![Alt text](scholes_yoptions_files/scholes_yoptions_8_0.png "Predicted Call vs Strike Price")
 
 
 
