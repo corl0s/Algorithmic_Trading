@@ -33,7 +33,158 @@ The algorithm will be evaluated via **paper trading** using the **Alpaca API**. 
 
 ## Video Presentation - https://youtu.be/QaFBKDdi5EI
 
-# **Historical Stock Data Visualization and Transformer-Based Price Prediction**
+
+
+
+# 1. AI-Powered Sentiment Trading Bot (LumiBot + Ollama)
+
+## 1. Project Overview
+This project implements an algorithmic trading strategy that fuses traditional technical backtesting with Generative AI. It uses **LumiBot** for the trading framework and **Ollama (running Llama 3)** to perform Natural Language Processing (NLP) on financial news.
+
+The bot scrapes news headlines, analyzes them for market sentiment (Positive/Negative) and confidence (0.0 to 1.0), and executes Buy/Sell orders based on these AI-driven signals.
+
+## 2. Key Features
+* **Hybrid Architecture:** Combines deterministic trading logic with probabilistic LLM reasoning.
+* **Local LLM Inference:** Uses `Ollama` to run Llama 3 locally, ensuring privacy and zero API costs for the LLM.
+* **Live Web Search:** Utilizes `DuckDuckGo` via LangChain to fetch real-time or date-specific market news.
+* **Structured Output:** Enforces strict JSON output from the LLM using Pydantic models (`BaseModel`), preventing parsing errors.
+* **Backtesting Engine:** Simulates performance using historical data via Yahoo Finance.
+
+## 3. Dependencies & Prerequisites
+To run this code, you need the following Python libraries and a running instance of Ollama.
+
+### Python Libraries
+```bash
+pip install lumibot ollama langchain-community duckduckgo-search colorama pydantic
+```
+
+### System Requirements
+
+* Ollama: Must be installed and running.
+
+* Model: You must pull the Llama 3 model before running the script:
+
+```
+ollama pull llama3
+```
+
+
+## 4. Code Architecture & Breakdown
+
+The code provided includes two variations: one for Stocks (SPY) and one for Crypto (BTC). Both share the same logic flow but use different market parameters.
+### A. Data Gathering (News)
+
+The bot uses the DuckDuckGoSearchAPIWrapper to find financial news.
+
+* Function: get_web_deets(start_date, end_date)
+* Process: It constructs a query (e.g., "S&P 500 market news sentiment [Date]" or "bitcoin crypto market news...") to fetch relevant headlines for the specific trading day being analyzed.
+
+### B. The AI Brain (Sentiment Analysis)
+
+This is the core differentiator of the strategy.
+
+* Prompt Engineering: The prompt_template function instructs the LLM to act as a financial analyst. It demands a specific JSON format containing a sentiment and a score.
+
+* Structured Response: The Response(BaseModel) class defines the expected data structure: { sentiment: String, score:Float }
+* Inference: The chat function sends the news to Llama 3. The temperature is set to 0 to ensure the model isdeterministic and factual, rather than creative.
+
+### C. The Trading Strategy (LumiBot)
+
+The logic is encapsulated in the StockTrader (or CryptoTrader) class, inheriting from Strategy.
+#### 1. Initialization (initialize)
+
+Sets up the environment.
+
+* Stocks: Sets market to "NYSE" (trading hours 9:30 AM - 4:00 PM ET).* 
+* Crypto: Sets market to "24/7" (non-stop trading).* 
+* Cash at Risk: Defines what percentage of the portfolio is used per trade (e.g., 50% for stocks, 20% for crypto).
+
+#### 2. Position Sizing (position_sizing)
+
+Calculates how many shares/coins to buy based on available cash and current price. $$ Quantity = \frac{Cash \times RiskFactor}{CurrentPrice} $$
+#### 3. Execution Logic (on_trading_iteration)
+
+This method runs on every iteration (daily in this config).
+
+* Check Data: Gets the current price and cash.
+* Get Signal: Calls get_sentiment() to analyze the news.
+* Decision Matrix:
+
+    * BUY Signal: If Sentiment == "positive" AND Score >= 0.7.    
+    * SELL Signal: If Sentiment == "negative" AND Score >= 0.7.   
+    * Neutral: If the score is below 0.7, no action is taken (holds position).
+
+#### D. Backtesting (__main__)
+
+The script uses YahooDataBacktesting.
+
+* It downloads historical price data for the specified timeframe (e.g., 2023-2024).
+* It runs the strategy over this historical data to simulate how the bot would have performed.
+
+<!-- 
+## 5. Comparison: Stock vs. Crypto Implementation
+
+The provided code contains two slightly different implementations. Here are the differences:
+
+Feature,Stock Implementation,Crypto Implementation
+Asset Class,SPY (S&P 500 ETF),BTC-USD (Bitcoin)
+Market Hours,NYSE (9:30 AM - 4:00 PM ET),24/7 (Non-stop)
+Search Query,"""S&P 500 market news...""","""bitcoin crypto market news..."""
+Risk Profile,cash_at_risk: 0.5 (Aggressive),cash_at_risk: 0.2 (Conservative) -->
+
+
+## 4.0 Comparative Performance Analysis: Equity vs. Cryptocurrency Models
+### 4.1 Executive Summary
+
+This section evaluates the performance of the core trading algorithm applied to two distinct asset classes: Equities (S&P 500/SPY) and Cryptocurrency (Bitcoin/BTC). The data reveals that while the adjusted model has been successfully optimized for the equity market, the same logic significantly underperforms in the cryptocurrency market due to a fundamental misinterpretation of upside volatility.
+### 4.2 Equity Strategy Evaluation (StockTrader)
+
+The optimized StockTrader strategy demonstrates high efficiency and strong alignment with the benchmark index.
+
+* Return Profile: The strategy generated an annual return of 21.9%, closely tracking the SPY benchmark.
+
+* Capital Efficiency: Analysis of the cash utilization curves (Teal Line) indicates the model remained fully invested during the majority of the reporting period. Unlike previous iterations, the model avoided "panic selling" during minor market noise, maintaining a cash position near 0% during the primary uptrends of 2023.
+
+* Risk Metrics: The strategy achieved a Sharpe Ratio of 1.18 and a Sortino Ratio of 1.79, indicating a favorable risk-adjusted return profile. The Maximum Drawdown was limited to -9.9%, suggesting the risk management parameters are well-tuned for standard equity market volatility.
+
+#### Equity Strategy Performance Chart
+
+<!-- ![Equity Strategy Performance Chart](C:\Vishnu\Boston University\Data Science\Project\final_exam\images\sp_500.png) -->
+![Equity Strategy Performance Chart](images/sp_500.png)
+*Figure: Cumulative returns and cash utilization for StockTrader strategy vs SPY benchmark.*
+
+### 4.3 Cryptocurrency Strategy Evaluation (CryptoTrader)
+
+The CryptoTrader strategy, utilizing identical logic, failed to capture the full momentum of the underlying asset.
+
+* Performance Gap: While the strategy achieved a total return of 94.04%, it significantly trailed the BTC-USD benchmark, which exceeded 140% over the same period.
+
+* The "Volatility Trap": Visual analysis of the trading behavior reveals a critical flaw during high-momentum rallies. During the parabolic price increase in November 2024, the algorithm’s cash position spiked to nearly 100%. This indicates the model interpreted the explosive upside volatility as risk, triggering a defensive exit to cash precisely when the asset was most profitable.
+
+* Opportunity Cost: By exiting the market during these high-volatility expansion phases, the strategy suffered from significant opportunity cost, effectively "selling the winners" prematurely.
+
+#### Cryptocurrency Strategy Performance Chart
+
+
+![Cryptocurrency Strategy Performance Chart](images/crypto.png)
+*Figure: BTC returns vs CryptoTrader strategy and cash position during high-volatility periods.*
+
+
+### 4.4 Technical Conclusion & Recommendations
+
+The divergence in performance highlights that volatility functions differently across asset classes.
+
+* In Equities (SPY): High volatility is often correlated with downside risk (crashes). The model’s defensive logic correctly preserved capital.
+
+* In Crypto (BTC): High volatility is often correlated with upside expansion (rallies). The model’s defensive logic incorrectly identified this as a threat.
+
+
+
+
+
+
+
+# 2. **Historical Stock Data Visualization and Transformer-Based Price Prediction**
 
 ## **1. Objective**
 We analyze stock market data using various visualization techniques and model historical stock data using a Transformer-based deep learning model. This helps understand trends, volatility, relationships between assets, and predictive performance of modern sequence models on financial data.
@@ -500,7 +651,7 @@ In short, while Transformers can model long-term dependencies, they struggle wit
 
 
 
-# Option Pricing Methods: Black-Scholes and Binomial Model
+# 3. Option Pricing Methods: Black-Scholes and Binomial Model
 
 For options data, we first begin with an analytical approach using two fundamental option pricing methods widely used in quantitative finance: the **Black-Scholes Model** and the **Binomial Options Pricing Model**. These methods are essential for valuing options and understanding the dynamics of financial derivatives. As an initial analysis and observation, we currently only propose these two analytical method solution for Options data and further will shift towards deep neural networks.
 
@@ -809,7 +960,171 @@ For simpler comparison, we have used the European call options data. We finally 
 
 ---
 
-# Hybrid GARCH + LSTM Model for Stock Market Prediction
+
+
+
+# 4. Deep RL Trading Agent (DQTN)
+
+This project implements a sophisticated stock trading agent using **Deep Reinforcement Learning (DRL)** combined with a **Transformer Neural Network** architecture. The goal is to train an agent that can learn optimal trading policies (Buy, Sell, Hold) by interacting with a simulated stock market environment.
+
+---
+
+## Deep Reinforcement Learning (DRL)
+
+DRL is the backbone of this project, blending classical Reinforcement Learning (RL) with deep neural networks to allow the agent to learn from raw, high-dimensional market data.
+
+### A. The RL Framework
+
+The agent learns through the fundamental RL loop: **State $\rightarrow$ Action $\rightarrow$ New State, Reward**.
+
+| Component | Role in the System |
+| :--- | :--- |
+| **Agent** (`Agent` class) | The decision-maker, containing the DQTN (the brain). |
+| **Environment** (`Env` class) | Simulates the stock market, handling time, price changes, and portfolio value. |
+| **State** | The input to the agent: a **normalized time-series** of prices (e.g., 364 days look-back window) from the `Stock` class. |
+| **Action Space** | **Buy (1)**, **Sell (0)**, or **Hold (0)** (depending on the current position). |
+| **Reward** | The feedback signal, calculated as the **logarithmic return** of the portfolio, adjusted by the trading **`Fee`**. Maximizing cumulative reward is the objective. |
+
+### B. Deep Q-Networks (DQN)
+
+The agent uses the DQN algorithm, a crucial technique for training DRL agents with discrete actions. 
+
+[Image of Deep Q-Network Architecture]
+
+
+* **Q-Value:** The predicted maximum cumulative future reward expected from taking a specific action $a$ in a state $s$, denoted as $Q(s, a)$.
+* **Policy Network (`policy_net`):** The network that estimates the $Q(s, a)$ values and is used to select the action with the highest estimated return.
+* **Target Network (`target_net`):** A stable, periodically updated copy of the policy network. It is used to calculate the stable future expected reward (the *target* Q-value) in the Bellman equation, minimizing learning instability.
+
+### C. Exploration vs. Exploitation ($\epsilon$-Greedy)
+
+During training, the agent uses the **$\epsilon$-greedy strategy** to balance trying new things (exploration) and using what it has learned (exploitation).
+
+* **Exploration:** With probability $\epsilon$ (starting high), the agent chooses a random action.
+* **Exploitation:** With probability $1-\epsilon$, the agent chooses the best action according to its learned policy.
+* **Decay:** The $\epsilon$ value gradually decreases (`epsilon_decay`), causing the agent to rely less on randomness and more on its trained policy over time.
+
+---
+
+## Transformer Networks (DQTN)
+
+The **Transformer** is integrated into the Q-Network (`DQTN`) because stock data is inherently a **time sequence**.
+
+### A. Sequence Processing Power
+
+The Transformer, known for its success in sequence tasks (like NLP), processes the entire input state (the 364-day price window) simultaneously using **Self-Attention**. This allows it to:
+
+* Capture **long-range dependencies** (relationships between old and recent prices) efficiently.
+* Dynamically assign **attention/importance** to specific time points within the input sequence, allowing the model to focus on the most relevant market moves for the current trade decision.
+
+### B. State Preparation
+
+The sequential nature of the input requires special preparation before feeding it to the Transformer:
+
+1.  **Normalization:** Price data is scaled to a small, consistent range (e.g., $0$ to $1$) for optimal neural network training.
+2.  **Positional Encoding:** Since the Transformer processes the entire sequence at once, **Positional Encoding** is added to the data to explicitly restore the chronological order (the time dimension) that the network would otherwise lose.
+
+---
+<!-- 
+## Project Structure and Execution
+
+The project follows a standard structure for DRL applications, separating the agent, environment, and data handling logic.
+
+### A. Directory Tree -->
+
+
+
+### B. Core Execution Flow
+
+1.  **Data Preparation:** `create_test.py` downloads historical price data from **Yahoo Finance**, applies the required look-back window and normalization, and pickles the `Stock` objects into the `data/test` directory.
+2.  **Training:** `main.py` initializes the `Agent`, fills the **`ReplayMemory`** (a circular buffer used to store and randomly sample experiences, stabilizing the learning process), and executes the `agent.train()` loop.
+3.  **Testing/Evaluation:** `test.py` loads the saved `policy_net` weights and runs the agent through the test data (unseen by the model during training). The **`Env.render()`** function generates visualizations (stock price vs. trade actions) to inspect the agent's strategy.
+
+### C. Performance Visualization
+
+The visualization generated during testing provides the final verdict on the agent's generalization ability.
+
+* The **Price Chart** plots the stock price with **Green ($\triangle$)** markers for Buys and **Red ($\nabla$)** markers for Sells.
+* The **Cumulative Return** chart tracks the portfolio's multiplier over time.
+    * **$1.0$** is the break-even line.
+    * A final return **$> 1.0$** indicates a profitable strategy.
+    * A final return **$< 1.0$** indicates a loss during the test period.
+
+
+
+![DQTN Test Performance (0.785 Return)](scholes_yoptions_files\Figure_1.png "Test Run 1: Sub-Optimal Performance")
+
+
+
+    
+
+Training Status
+-------------------
+
+The agent completed 100 training episodes, reaching a stage of stable optimization before testing began.
+
+<!-- **MetricFinal Value (Ep: 101)TrendAverage Loss**$0.000$Stable and minimal.**Average Performance (Multiplier)**$1.053$Net profitable performance during training episodes.**Learning Rate (Lr)**$3.49 \\times 10^{-5}$Low, suggesting fine-tuning phase by the StepLR scheduler.**Epsilon ($\\epsilon$)**$0.005$Minimal exploration, indicating the agent is primarily exploiting its learned policy. -->
+
+
+Ep: 100, Reward: 0.3184, Reward (avg): 0.0024, Performance: 1.439, Performance (avg): 1.036, Lr: 3.49e-05, Loss: 0.0002, Loss (avg) 0.000, Epsilon: 0.005
+
+
+Performance Visualization
+------------------------------
+
+The visualization generated during testing provides the final verdict on the agent's generalization ability across unseen data (out-of-sample).
+
+*   The **Price Chart** plots the stock price with **Green ($\\triangle$)** markers for Buys and **Red ($\\nabla$)** markers for Sells.
+    
+*   The **Cumulative Return** chart tracks the portfolio's multiplier over time.
+    
+    *   **$1.0$** is the break-even line.
+        
+    *   A final return **$> 1.0$** indicates a profitable strategy.
+        
+    *   A final return **$< 1.0$** indicates a loss during the test period.
+        
+
+### A. Test Run 1: Sub-Optimal Performance (Final Return: 0.785)
+
+
+#### 🔍 Inference
+
+**ObservationConclusionFinal Return$0.785$** (Loss of **$21.5\\%$**)**Portfolio Value**Cumulative Return line is flat and consistently below $1.0$.**Trading Activity**Sparse trades, with few Buy ($\\triangle$) or Sell ($\\nabla$) markers.
+
+### B. Test Run 2: Successful Generalization (Final Return: 1.020)
+
+This chart demonstrates the agent successfully executing a profitable strategy in a different test environment.
+
+#### 🔍 Inference
+
+**ObservationConclusionFinal Return$1.020$** (Profit of **$2.0\\%$**)**Portfolio Value**The Cumulative Return shows a strong increase in value, peaking around $1.20$, before a slight retracement.**Trading ActivityFrequent trades**, with Buy ($\\triangle$) often preceding price rallies and Sell ($\\nabla$) occurring near subsequent local peaks.
+
+IV. Summary and Future Work
+---------------------------
+
+The DQTN demonstrates **inconsistent generalization**, performing well in one test environment (Final Return $1.020$) but failing to adapt to another ($0.785$). This suggests the policy is not sufficiently robust to handle all out-of-sample market conditions.
+
+### Future Improvements
+
+*   **Robustness Training:** Implement **Averaged DQN** or **Ensemble Methods** to stabilize Q-value estimation and prevent policy collapse.
+    
+*   **Experience Replay Prioritization:** Introduce **Prioritized Experience Replay (PER)** to focus learning on unexpected or high-error state transitions, which are crucial for generalization.
+    
+*   **Risk Metric Reward:** Integrate a risk-adjusted metric (like the Sharpe Ratio) into the reward function to encourage smoother equity curves and discourage large drawdowns.
+
+
+
+
+
+
+
+
+
+
+
+
+# 5. Hybrid GARCH + LSTM Model for Stock Market Prediction
 
 <!-- **Author:** Vijay Krishna Sundaran Saravanan  
 **BU ID:** U63589838  
@@ -1044,3 +1359,260 @@ This hybrid design bridges **financial econometrics** and **deep learning**, all
   Develop a full pipeline integrating **data ingestion**, **signal generation**, **risk management**, and **portfolio evaluation**, ultimately transitioning from paper trading to a deployable automated trading strategy.
 
 
+
+
+
+
+
+
+
+
+# 6. PatchTST Algorithmic Trading System  
+*A Deep Learning–Powered Trading Bot Using PatchTST + Alpaca Paper Trading*
+
+This repository contains a **full end-to-end algorithmic trading pipeline**, from  
+historical data ingestion → feature engineering → deep-learning prediction → automated order execution through **Alpaca’s Paper Trading API**.
+
+The system leverages **PatchTST**, a state-of-the-art Transformer model designed specifically for long-horizon time-series forecasting.
+
+---
+
+# Features
+
+✔ Fully automated data ingestion from Alpaca’s IEX feed  
+✔ Technical indicator engineering (SMA, EMA, RSI, ATR, Volatility)  
+✔ PatchTST deep learning architecture for next-day return forecasting  
+✔ Clean training pipeline with scaling + sequences  
+✔ Trade execution via Alpaca *with bracket orders*  
+✔ Dry-run mode for safe testing  
+✔ Production-ready trading bot (`patchtst_alpaca_bot.py`)  
+✔ Detailed documentation and reproducible notebook  
+
+---
+
+# System Architecture
+
+The system contains four major layers:
+
+## **1. Data Layer**
+- Uses Alpaca’s Historical Market Data (IEX).
+- Downloads up to 10 years of OHLCV data.
+- Adds technical indicators:
+  - SMA10 / SMA50
+  - EMA12 / EMA26
+  - RSI14
+  - ATR14
+  - Volatility (20-day std)
+  - Close/SMA ratios
+
+Ensures exact match between training-time and live-time features.
+
+---
+
+## **2. Model Layer (PatchTST)**
+
+PatchTST is a Transformer architecture optimized for time-series tasks.
+
+### Model Highlights:
+- Sequence length: **84 days**
+- Patch length: **7 days**
+- Model dimension: **128**
+- Multi-head attention: **8 heads**
+- Transformer layers: **4**
+- Output: **1-step ahead predicted return**
+
+### Why PatchTST?
+- Reduces sequence complexity by patching  
+- Captures both short and long-term dependencies  
+- More efficient and accurate than LSTM, GRU, or vanilla Transformers  
+- Proven strong on financial datasets  
+
+---
+
+## **3. Training Pipeline**
+
+### Steps:
+1. Normalize all features with `StandardScaler`  
+2. Convert time-series into (84 × 12) sequences  
+3. Split dataset:
+   - 80% training  
+   - 10% validation  
+   - 10% testing  
+4. Train PatchTST using:
+   - **Loss:** MSE  
+   - **Optimizer:** Adam  
+   - **Batch size:** 64  
+
+### Model Checkpoint Includes:
+- Model weights  
+- Feature columns  
+- Trained scaler  
+- Sequence length & patch length configuration  
+
+---
+
+## **4. Trading Layer (Live Bot)**
+
+### Trading Flow:
+```
+Live Alpaca Data → Indicators → Scaler → PatchTST → Prediction → Signal → Order
+```
+
+### Signal Logic:
+- BUY if prediction is in **top 25% quantile**
+- Only BUY if RSI < 70 (avoid overbought conditions)
+- Max exposure: **1 active position**
+- SELL positions that drop below threshold
+
+### Position Sizing:
+```
+Position = (Equity × 0.25) ÷ Last Close Price
+```
+
+### Order Type:
+- Market BUY  
+- Stop-loss at **−3%**  
+- Take-profit at **+6%**
+
+All executed as a **bracket order**.
+
+### Dry Run Mode:
+- `DRY_RUN = True` → bot only prints simulated trades  
+- `DRY_RUN = False` → executes real paper trades  
+
+---
+
+# 🔄 Data Flow Diagram
+
+```
+                ┌────────────────────┐
+                │  Alpaca IEX Data   │
+                └─────────┬──────────┘
+                          │
+                          ▼
+               ┌──────────────────────┐
+               │ Feature Engineering  │
+               └─────────┬────────────┘
+                         │
+                         ▼
+           ┌────────────────────────────┐
+           │ PatchTST Model Prediction  │
+           └───────────┬────────────────┘
+                       │
+                       ▼
+            ┌─────────────────────────┐
+            │  Trading Signal Engine  │
+            └──────────┬──────────────┘
+                       │
+                       ▼
+             ┌────────────────────────┐
+             │ Alpaca Order Executor │
+             └────────────────────────┘
+```
+
+---
+
+# 📂 Project Structure
+
+```
+project/
+│── models/
+│   └── patchtst_final.pth
+│── keys/
+│   └── alpaca_keys.txt
+│── training_notebook.ipynb
+│── patchtst_alpaca_bot.py
+│── README.md
+```
+
+---
+
+# ⚙️ Installation & Setup
+
+## 1. Install Dependencies
+```bash
+pip install torch pandas numpy alpaca-trade-api matplotlib scikit-learn yfinance
+```
+
+## 2. Add Alpaca Keys
+Create:
+
+```
+keys/alpaca_keys.txt
+```
+
+Inside:
+```
+APCA_API_KEY_ID=YOUR_KEY
+APCA_API_SECRET_KEY=YOUR_SECRET
+```
+
+## 3. Train Model
+Open:
+
+```
+training_notebook.ipynb
+```
+
+Train PatchTST and it will generate:
+
+```
+models/patchtst_final.pth
+```
+
+## 4. Run Trading Bot
+```bash
+python3 patchtst_alpaca_bot.py
+```
+
+Disable dry mode for actual paper trades:
+```python
+DRY_RUN = False
+```
+
+---
+
+# 📊 Example Outputs
+
+### Predictions
+```
+AAPL → 0.0050
+MSFT → 0.0096
+AMZN → 0.0121
+GOOG → 0.0166
+```
+
+### Trading Signals
+```
+{'AAPL': 0, 'MSFT': 0, 'AMZN': 0, 'GOOG': 1}
+```
+
+### Executed Order (Paper Trading)
+- Market Buy: **31 shares of GOOG**
+- Stop-loss: **$311.25**
+- Take-profit: **$340.13**
+
+![alt text](<Screenshot 2025-12-10 at 10.00.51 PM.png>)
+---
+
+# 🛠 Future Enhancements
+
+- 🔁 Automatic weekly retraining  
+- 📈 Integrated backtesting  
+- 🧠 Multi-timeframe PatchTST (daily + hourly)  
+- 🧮 Portfolio optimization  
+- 📤 Telegram/Discord alerts  
+- 🖥 Web dashboard for live monitoring  
+
+---
+
+# 🏁 Conclusion
+
+This project delivers a **modern, data-driven trading platform** with:
+
+- Strong deep-learning forecasting  
+- A clean data → model → trading workflow  
+- Realistic execution through Alpaca's paper trading  
+- A scalable architecture suitable for professional quant development  
+
+---
