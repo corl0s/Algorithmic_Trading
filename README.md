@@ -1052,7 +1052,7 @@ The visualization generated during testing provides the final verdict on the age
 
 
 
-![DQTN Test Performance (0.785 Return)](scholes_yoptions_files\Figure_1.png "Test Run 1: Sub-Optimal Performance")
+![DQTN Test Performance (0.785 Return)](scholes_yoptions_files\Figure_1.png)
 
 
 
