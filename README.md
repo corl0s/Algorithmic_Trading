@@ -1052,8 +1052,7 @@ The visualization generated during testing provides the final verdict on the age
 
 
 
-![DQTN Test Performance (0.785 Return)](scholes_yoptions_files/Figure_1.png)
-
+![DQTN Test Performance (0.785 Return)](images/Figure_1.png)
 
 
     
