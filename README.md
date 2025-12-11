@@ -1394,6 +1394,30 @@ The system leverages **PatchTST**, a state-of-the-art Transformer model designed
 The system contains four major layers:
 
 ## **1. Data Layer**
+Below are the core indicator functions used in both training and live prediction:
+
+```python
+def SMA(series, n):
+    return series.rolling(n).mean()
+
+def EMA(series, n):
+    return series.ewm(span=n, adjust=False).mean()
+
+def RSI(series, n=14):
+    delta = series.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    rs = gain.rolling(n).mean() / loss.rolling(n).mean()
+    return 100 - (100 / (1 + rs))
+
+def ATR(df, n=14):
+    high_low = df["High"] - df["Low"]
+    high_close = (df["High"] - df["Close"].shift()).abs()
+    low_close = (df["Low"] - df["Close"].shift()).abs()
+    tr = high_low.to_frame().join(high_close).join(low_close).max(axis=1)
+    return tr.rolling(n).mean()
+```
+
 - Uses Alpaca’s Historical Market Data (IEX).
 - Downloads up to 10 years of OHLCV data.
 - Adds technical indicators:
@@ -1412,6 +1436,38 @@ Ensures exact match between training-time and live-time features.
 
 PatchTST is a Transformer architecture optimized for time-series tasks.
 
+### PatchTST Model Code
+
+```python
+class PatchTST(nn.Module):
+    def __init__(self, seq_len=84, patch_len=7, d_model=128, n_heads=8, num_layers=4, num_features=12):
+        super().__init__()
+        self.patch_len = patch_len
+        self.num_patches = seq_len // patch_len
+
+        self.input_proj = nn.Linear(patch_len * num_features, d_model)
+        self.pos_embedding = nn.Parameter(torch.randn(1, self.num_patches, d_model))
+
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=n_heads,
+            batch_first=True,
+            dropout=0.1
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+
+        self.fc = nn.Linear(d_model, 1)
+
+    def forward(self, x):
+        B, T, F = x.shape
+        x = x.reshape(B, self.num_patches, self.patch_len * F)
+        x = self.input_proj(x)
+        x = x + self.pos_embedding
+        x = self.encoder(x)
+        out = self.fc(x[:, -1])
+        return out
+```
+
 ### Model Highlights:
 - Sequence length: **84 days**
 - Patch length: **7 days**
@@ -1420,14 +1476,20 @@ PatchTST is a Transformer architecture optimized for time-series tasks.
 - Transformer layers: **4**
 - Output: **1-step ahead predicted return**
 
-### Why PatchTST?
-- Reduces sequence complexity by patching  
-- Captures both short and long-term dependencies  
-- More efficient and accurate than LSTM, GRU, or vanilla Transformers  
-- Proven strong on financial datasets  
-
 ---
+### Reference:
 
+```
+@inproceedings{Yuqietal-2023-PatchTST,
+  title     = {A Time Series is Worth 64 Words: Long-term Forecasting with Transformers},
+  author    = {Nie, Yuqi and
+               H. Nguyen, Nam and
+               Sinthong, Phanwadee and 
+               Kalagnanam, Jayant},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2023}
+}
+```
 ## **3. Training Pipeline**
 
 ### Steps:
@@ -1452,126 +1514,38 @@ PatchTST is a Transformer architecture optimized for time-series tasks.
 
 ## **4. Trading Layer (Live Bot)**
 
+### Prediction Logic Example
+```python
+def predict_signal(model, scaler, df_recent, features):
+    X = scaler.transform(df_recent[features])
+    X = torch.tensor(X, dtype=torch.float32).unsqueeze(0)
+    pred = model(X).item()
+    return pred
+```
+
+### Bracket Order Execution
+```python
+def place_bracket_order(api, symbol, qty, last_price):
+    api.submit_order(
+        symbol=symbol,
+        qty=qty,
+        side="buy",
+        type="market",
+        time_in_force="day",
+        order_class="bracket",
+        take_profit={"limit_price": round(last_price * 1.06, 2)},
+        stop_loss={"stop_price": round(last_price * 0.97, 2)}
+    )
+```
+
 ### Trading Flow:
 ```
 Live Alpaca Data → Indicators → Scaler → PatchTST → Prediction → Signal → Order
 ```
 
-### Signal Logic:
-- BUY if prediction is in **top 25% quantile**
-- Only BUY if RSI < 70 (avoid overbought conditions)
-- Max exposure: **1 active position**
-- SELL positions that drop below threshold
-
-### Position Sizing:
-```
-Position = (Equity × 0.25) ÷ Last Close Price
-```
-
-### Order Type:
-- Market BUY  
-- Stop-loss at **−3%**  
-- Take-profit at **+6%**
-
-All executed as a **bracket order**.
-
-### Dry Run Mode:
-- `DRY_RUN = True` → bot only prints simulated trades  
-- `DRY_RUN = False` → executes real paper trades  
-
 ---
 
-# 🔄 Data Flow Diagram
-
-```
-                ┌────────────────────┐
-                │  Alpaca IEX Data   │
-                └─────────┬──────────┘
-                          │
-                          ▼
-               ┌──────────────────────┐
-               │ Feature Engineering  │
-               └─────────┬────────────┘
-                         │
-                         ▼
-           ┌────────────────────────────┐
-           │ PatchTST Model Prediction  │
-           └───────────┬────────────────┘
-                       │
-                       ▼
-            ┌─────────────────────────┐
-            │  Trading Signal Engine  │
-            └──────────┬──────────────┘
-                       │
-                       ▼
-             ┌────────────────────────┐
-             │ Alpaca Order Executor │
-             └────────────────────────┘
-```
-
----
-
-# 📂 Project Structure
-
-```
-project/
-│── models/
-│   └── patchtst_final.pth
-│── keys/
-│   └── alpaca_keys.txt
-│── training_notebook.ipynb
-│── patchtst_alpaca_bot.py
-│── README.md
-```
-
----
-
-# ⚙️ Installation & Setup
-
-## 1. Install Dependencies
-```bash
-pip install torch pandas numpy alpaca-trade-api matplotlib scikit-learn yfinance
-```
-
-## 2. Add Alpaca Keys
-Create:
-
-```
-keys/alpaca_keys.txt
-```
-
-Inside:
-```
-APCA_API_KEY_ID=YOUR_KEY
-APCA_API_SECRET_KEY=YOUR_SECRET
-```
-
-## 3. Train Model
-Open:
-
-```
-training_notebook.ipynb
-```
-
-Train PatchTST and it will generate:
-
-```
-models/patchtst_final.pth
-```
-
-## 4. Run Trading Bot
-```bash
-python3 patchtst_alpaca_bot.py
-```
-
-Disable dry mode for actual paper trades:
-```python
-DRY_RUN = False
-```
-
----
-
-# 📊 Example Outputs
+# Example Outputs
 
 ### Predictions
 ```
@@ -1591,21 +1565,21 @@ GOOG → 0.0166
 - Stop-loss: **$311.25**
 - Take-profit: **$340.13**
 
-![alt text](<Screenshot 2025-12-10 at 10.00.51 PM.png>)
+![alt text](images/output2.png)
 ---
 
-# 🛠 Future Enhancements
+#  Future Enhancements
 
-- 🔁 Automatic weekly retraining  
-- 📈 Integrated backtesting  
-- 🧠 Multi-timeframe PatchTST (daily + hourly)  
-- 🧮 Portfolio optimization  
-- 📤 Telegram/Discord alerts  
-- 🖥 Web dashboard for live monitoring  
+- Automatic weekly retraining  
+-  Integrated backtesting  
+-  Multi-timeframe PatchTST (daily + hourly)  
+- Portfolio optimization  
+- Telegram/Discord alerts  
+- Web dashboard for live monitoring  
 
 ---
 
-# 🏁 Conclusion
+# Conclusion
 
 This project delivers a **modern, data-driven trading platform** with:
 
