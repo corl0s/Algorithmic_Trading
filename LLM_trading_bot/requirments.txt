@@ -1,0 +1,16 @@
+# Core Trading Framework
+lumibot
+
+# AI & LLM Interactions
+ollama
+langchain-community
+duckduckgo-search
+
+# Data Validation & Models
+pydantic
+
+# Terminal Formatting
+colorama
+
+# Data Source (Likely required by YahooDataBacktesting)
+yfinance
